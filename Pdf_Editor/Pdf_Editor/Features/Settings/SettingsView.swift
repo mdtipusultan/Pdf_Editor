@@ -109,6 +109,20 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Toggle("Testing Mode", isOn: Binding(
+                get: { entitlement.debugProOverride == true },
+                set: { isOn in
+                    if isOn {
+                        EntitlementManager.shared.enableDebugPro()
+                    } else {
+                        EntitlementManager.shared.disableDebugPro()
+                    }
+                }
+            ))
+            Text("Enables Pro, including existing text editing. This switch is compiled out of Release builds.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Button("Enable Pro (Debug)") {
                 EntitlementManager.shared.enableDebugPro()
             }

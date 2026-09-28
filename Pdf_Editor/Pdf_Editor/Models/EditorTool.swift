@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum EditorTool: String, CaseIterable, Identifiable {
+    case editText
     case text
     case draw
     case highlight
@@ -13,7 +14,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .text: "Text"
+        case .editText: "Edit Text"
+        case .text: "Add Text"
         case .draw: "Draw"
         case .highlight: "Highlight"
         case .signature: "Sign"
@@ -25,6 +27,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .editText: "character.cursor.ibeam"
         case .text: "textformat"
         case .draw: "pencil.tip"
         case .highlight: "highlighter"
@@ -37,7 +40,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
 
     var requiresPro: Bool {
         switch self {
-        case .pages, .shape, .image: true
+        case .editText, .pages, .shape, .image: true
         default: false
         }
     }

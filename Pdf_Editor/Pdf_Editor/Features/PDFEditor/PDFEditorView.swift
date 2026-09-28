@@ -18,6 +18,41 @@ struct PDFEditorView: View {
         .sheet(isPresented: $viewModel.showTextEditor) {
             TextAnnotationSheet(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.showExistingTextEditor) {
+            TextEditingView(viewModel: viewModel)
+        }
+        .confirmationDialog("Text", isPresented: $viewModel.showTextMoreOptions, titleVisibility: .visible) {
+            Button("Select Word") { viewModel.selectWordAtLastTap() }
+            Button("Select Paragraph") { viewModel.selectParagraph() }
+            Button("Copy") { viewModel.copySelectedText() }
+            Button("Add Text Instead") { viewModel.beginAddTextFallback() }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Can't Edit Text", isPresented: Binding(
+            get: { viewModel.editBlockMessage != nil },
+            set: { if !$0 { viewModel.editBlockMessage = nil } }
+        )) {
+            if viewModel.editBlockOffersAddText {
+                Button("Add Text Instead") { viewModel.beginAddTextFallback() }
+            }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.editBlockMessage ?? "")
+        }
+        .alert("Digital Signature", isPresented: $viewModel.showSignatureWarning) {
+            Button("Continue") { viewModel.acknowledgeSignatureAndContinue() }
+            Button("Cancel", role: .cancel) { viewModel.cancelSignatureWarning() }
+        } message: {
+            Text("Editing this PDF may invalidate its existing digital signature.")
+        }
+        .onChange(of: viewModel.shouldPresentExport) { _, ready in
+            guard ready else { return }
+            viewModel.shouldPresentExport = false
+            finishExport()
+        }
+        .task(id: viewModel.currentPageIndex) {
+            await viewModel.prepareCurrentPage()
+        }
         .sheet(isPresented: $viewModel.showSignaturePad) {
             SignaturePadView(savedSignature: viewModel.savedSignature) { image in
                 viewModel.applySignature(image)
@@ -74,7 +109,7 @@ struct PDFEditorView: View {
             .accessibilityLabel("Redo")
 
             Button {
-                prepareExport()
+                viewModel.requestExport()
             } label: {
                 Text("Done")
                     .font(.subheadline.weight(.semibold))
@@ -91,17 +126,69 @@ struct PDFEditorView: View {
             PDFKitEditorView(
                 document: viewModel.document,
                 currentPageIndex: $viewModel.currentPageIndex,
+                documentRevision: viewModel.documentRevision,
                 isDrawingEnabled: viewModel.isDrawingEnabled,
                 drawColor: viewModel.drawUIColor,
                 drawLineWidth: CGFloat(viewModel.penSize),
+                isTextSelectionEnabled: viewModel.isTextSelectionEnabled,
+                selectedTextPageIndex: viewModel.selectedTextPageIndex,
+                selectedTextBounds: viewModel.selectedTextBounds,
                 onAnnotationAdded: {
                     viewModel.recordChange()
                     viewModel.hasUnsavedChanges = true
+                },
+                onTextTap: { pageIndex, point in
+                    viewModel.handleTextTap(pageIndex: pageIndex, point: point)
                 }
             )
 
-            pageIndicator
+            VStack(spacing: 8) {
+                if viewModel.selectedTextElement != nil {
+                    textSelectionBar
+                } else if viewModel.isTextSelectionEnabled {
+                    Text("Tap existing text to select it")
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                }
+                pageIndicator
+            }
         }
+    }
+
+    private var textSelectionBar: some View {
+        VStack(spacing: 6) {
+            if let text = viewModel.selectedTextElement?.text {
+                Text(text)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 8) {
+                textAction("Edit", systemImage: "pencil") { viewModel.beginEditingSelection() }
+                textAction("Style", systemImage: "textformat") { viewModel.beginEditingSelection() }
+                textAction("Delete", systemImage: "trash") { viewModel.deleteSelectedText() }
+                textAction("More", systemImage: "ellipsis") { viewModel.showTextMoreOptions = true }
+            }
+        }
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func textAction(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: systemImage)
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     private var pageIndicator: some View {
@@ -117,6 +204,7 @@ struct PDFEditorView: View {
 
     private var bottomToolbar: some View {
         VStack(spacing: 0) {
+            pageKindBanner
             if viewModel.selectedTool == .draw || viewModel.selectedTool == .highlight {
                 toolOptionsBar
             }
@@ -148,6 +236,36 @@ struct PDFEditorView: View {
             }
             .padding(.vertical, 8)
             .background(.bar)
+        }
+    }
+
+    @ViewBuilder
+    private var pageKindBanner: some View {
+        switch viewModel.pageContentKind {
+        case .scanned:
+            HStack {
+                Text("Scanned PDF")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Button(viewModel.isRecognizingText ? "Reading..." : "Use OCR to edit text") {
+                    Task { await viewModel.recognizeCurrentPage() }
+                }
+                .font(.caption.weight(.semibold))
+                .disabled(viewModel.isRecognizingText)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(AppTheme.cardBackground)
+        case .mixed:
+            Text("Text on this page can be edited. Image areas can't.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .background(AppTheme.cardBackground)
+        case .text:
+            EmptyView()
         }
     }
 
@@ -187,7 +305,7 @@ struct PDFEditorView: View {
         .background(AppTheme.cardBackground)
     }
 
-    private func prepareExport() {
+    private func finishExport() {
         if UserPreferences.shared.autoSave || viewModel.hasUnsavedChanges {
             do {
                 try viewModel.saveDocument()

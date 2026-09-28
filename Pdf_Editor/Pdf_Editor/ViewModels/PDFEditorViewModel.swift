@@ -28,14 +28,51 @@ final class PDFEditorViewModel {
     var isSaving = false
     var errorMessage: String?
     var hasUnsavedChanges = false
+    var documentRevision = 0
+    var selectedTextElement: PDFTextElement?
+    var showExistingTextEditor = false
+    var showTextMoreOptions = false
+    var textDraft = ""
+    var styleDraft = PDFTextStyle.fallback
+    var editBlockMessage: String?
+    var editBlockOffersAddText = false
+    var showSignatureWarning = false
+    var shouldPresentExport = false
+    var isRecognizingText = false
+    var pageContentKind: PDFPageContentKind = .text
+    var hasDigitalSignature = false
 
     private let undoManager = PDFUndoManager()
     private let featureAccess = AppFeatureAccess.shared
+    private let textEngine = PDFTextEngine()
+    private let ocrService = VisionPDFOCRService()
+    private var editingRestriction: PDFEditingRestriction?
+    private var didAcknowledgeSignatureWarning = false
+    private var pendingSignatureAction: PendingSignatureAction?
+    private var lastTextTapPoint: CGPoint?
+    private var lastTextTapPage = 0
+
+    private enum PendingSignatureAction {
+        case beginEdit
+        case deleteSelection
+        case export
+    }
 
     var canUndo: Bool { undoManager.canUndo }
     var canRedo: Bool { undoManager.canRedo }
     var pageCount: Int { document.pageCount }
     var annotationCount: Int { PDFAnnotationHelper.annotationCount(in: document) }
+    var isTextSelectionEnabled: Bool {
+        switch selectedTool {
+        case .none, .editText: true
+        default: false
+        }
+    }
+    var selectedTextBounds: CGRect? { selectedTextElement?.bounds }
+    var selectedTextPageIndex: Int? {
+        guard let selectedTextElement else { return nil }
+        return selectedTextElement.pageIndex
+    }
 
     init(document: PDFDocument, fileURL: URL, fileName: String) {
         self.document = document
@@ -43,6 +80,8 @@ final class PDFEditorViewModel {
         self.fileName = fileName
         self.selectedColor = Color(hex: UserPreferences.shared.defaultAnnotationColorHex) ?? .yellow
         self.penSize = UserPreferences.shared.defaultPenSize
+        self.hasDigitalSignature = PDFDocumentInspector.hasDigitalSignature(document)
+        self.editingRestriction = PDFDocumentInspector.editingRestriction(of: document)
         loadSavedSignature()
     }
 
@@ -65,6 +104,8 @@ final class PDFEditorViewModel {
     private func configureForTool(_ tool: EditorTool) {
         isDrawingEnabled = false
         switch tool {
+        case .editText:
+            break
         case .text:
             showTextEditor = true
         case .draw:
@@ -84,18 +125,26 @@ final class PDFEditorViewModel {
     }
 
     func recordChange() {
-        undoManager.recordSnapshot(document)
+        undoManager.recordSnapshot(document, textState: textEngine.snapshot())
         hasUnsavedChanges = true
     }
 
     func undo() {
-        guard undoManager.undo(on: document) else { return }
+        let state = textEngine.snapshot()
+        guard undoManager.undo(on: document, currentTextState: state) else { return }
+        textEngine.restore(undoManager.lastRestoredTextState)
+        selectedTextElement = nil
+        documentRevision += 1
         hasUnsavedChanges = true
         HapticsManager.lightImpact()
     }
 
     func redo() {
-        guard undoManager.redo(on: document) else { return }
+        let state = textEngine.snapshot()
+        guard undoManager.redo(on: document, currentTextState: state) else { return }
+        textEngine.restore(undoManager.lastRestoredTextState)
+        selectedTextElement = nil
+        documentRevision += 1
         hasUnsavedChanges = true
         HapticsManager.lightImpact()
     }
@@ -222,8 +271,14 @@ final class PDFEditorViewModel {
             return
         }
         recordChange()
+        let count = pageCount
         PageOperations.deletePage(at: index, in: document)
+        textEngine.notePageDeleted(at: index, previousPageCount: count)
+        if selectedTextElement?.pageIndex == index {
+            selectedTextElement = nil
+        }
         currentPageIndex = min(currentPageIndex, max(0, pageCount - 1))
+        documentRevision += 1
         hasUnsavedChanges = true
         HapticsManager.mediumImpact()
     }
@@ -235,6 +290,8 @@ final class PDFEditorViewModel {
         }
         recordChange()
         PageOperations.rotatePage(at: index, in: document)
+        textEngine.notePageRotated(at: index)
+        documentRevision += 1
         hasUnsavedChanges = true
         HapticsManager.lightImpact()
     }
@@ -245,7 +302,12 @@ final class PDFEditorViewModel {
             return
         }
         recordChange()
+        let count = pageCount
         PageOperations.duplicatePage(at: index, in: document)
+        if pageCount == count + 1 {
+            textEngine.notePageDuplicated(at: index, pageCountBeforeInsert: count)
+        }
+        documentRevision += 1
         hasUnsavedChanges = true
         HapticsManager.lightImpact()
     }
@@ -253,7 +315,10 @@ final class PDFEditorViewModel {
     func movePage(from source: Int, to destination: Int) {
         guard featureAccess.canUsePageManagement() else { return }
         recordChange()
+        let count = pageCount
         PageOperations.movePage(from: source, to: destination, in: document)
+        textEngine.notePageMoved(from: source, to: destination, pageCount: count)
+        documentRevision += 1
         hasUnsavedChanges = true
     }
 
@@ -283,6 +348,194 @@ final class PDFEditorViewModel {
         if let data = image.pngData() {
             UserDefaults.standard.set(data, forKey: "savedSignature")
         }
+    }
+
+    func prepareCurrentPage() async {
+        await Task.yield()
+        guard let page = document.page(at: currentPageIndex) else { return }
+        pageContentKind = textEngine.contentKind(of: page)
+        _ = textEngine.elements(on: currentPageIndex, document: document)
+    }
+
+    func handleTextTap(pageIndex: Int, point: CGPoint) {
+        lastTextTapPoint = point
+        lastTextTapPage = pageIndex
+        currentPageIndex = pageIndex
+        if let element = textEngine.element(at: point, on: pageIndex, document: document) {
+            selectedTextElement = element
+            HapticsManager.selection()
+        } else {
+            selectedTextElement = nil
+        }
+    }
+
+    func beginEditingSelection() {
+        guard selectedTextElement != nil else { return }
+        guard featureAccess.canEditExistingText() else {
+            errorMessage = "Editing existing text requires PDF Pro."
+            return
+        }
+        if let editingRestriction {
+            editBlockOffersAddText = false
+            editBlockMessage = editingRestriction.message
+            return
+        }
+        guard let selectedTextElement, selectedTextElement.canEditDirectly else {
+            editBlockOffersAddText = true
+            editBlockMessage = PDFTextEditError.unsupportedBackground.localizedDescription
+            return
+        }
+        if hasDigitalSignature && !didAcknowledgeSignatureWarning {
+            pendingSignatureAction = .beginEdit
+            showSignatureWarning = true
+            return
+        }
+        presentTextEditor()
+    }
+
+    func commitTextEdit() {
+        guard let selectedTextElement else { return }
+        let draft = textDraft
+        let style = styleDraft
+        showExistingTextEditor = false
+        recordChange()
+        do {
+            let updated = try textEngine.apply(
+                element: selectedTextElement,
+                newText: draft,
+                style: style,
+                document: document
+            )
+            if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                self.selectedTextElement = nil
+            } else {
+                self.selectedTextElement = updated
+            }
+            documentRevision += 1
+            hasUnsavedChanges = true
+            HapticsManager.success()
+        } catch {
+            undoManager.discardLastSnapshot()
+            editBlockOffersAddText = true
+            editBlockMessage = error.localizedDescription
+            HapticsManager.error()
+        }
+    }
+
+    func deleteSelectedText() {
+        guard let selectedTextElement else { return }
+        guard featureAccess.canEditExistingText() else {
+            errorMessage = "Editing existing text requires PDF Pro."
+            return
+        }
+        if let editingRestriction {
+            editBlockOffersAddText = false
+            editBlockMessage = editingRestriction.message
+            return
+        }
+        guard selectedTextElement.canEditDirectly else {
+            editBlockOffersAddText = true
+            editBlockMessage = PDFTextEditError.unsupportedBackground.localizedDescription
+            return
+        }
+        if hasDigitalSignature && !didAcknowledgeSignatureWarning {
+            pendingSignatureAction = .deleteSelection
+            showSignatureWarning = true
+            return
+        }
+        recordChange()
+        do {
+            _ = try textEngine.apply(
+                element: selectedTextElement,
+                newText: "",
+                style: selectedTextElement.style,
+                document: document
+            )
+            self.selectedTextElement = nil
+            documentRevision += 1
+            hasUnsavedChanges = true
+            HapticsManager.success()
+        } catch {
+            undoManager.discardLastSnapshot()
+            editBlockOffersAddText = true
+            editBlockMessage = error.localizedDescription
+        }
+    }
+
+    func selectWordAtLastTap() {
+        guard let lastTextTapPoint else { return }
+        selectedTextElement = textEngine.wordElement(at: lastTextTapPoint, on: lastTextTapPage, document: document)
+    }
+
+    func selectParagraph() {
+        guard let selectedTextElement else { return }
+        self.selectedTextElement = textEngine.paragraphElement(containing: selectedTextElement, document: document)
+    }
+
+    func copySelectedText() {
+        guard let text = selectedTextElement?.text else { return }
+        UIPasteboard.general.string = text
+        HapticsManager.success()
+    }
+
+    func beginAddTextFallback() {
+        editBlockMessage = nil
+        editBlockOffersAddText = false
+        selectedTool = .text
+        showTextEditor = true
+    }
+
+    func requestExport() {
+        if hasDigitalSignature && hasUnsavedChanges && !didAcknowledgeSignatureWarning {
+            pendingSignatureAction = .export
+            showSignatureWarning = true
+            return
+        }
+        shouldPresentExport = true
+    }
+
+    func acknowledgeSignatureAndContinue() {
+        didAcknowledgeSignatureWarning = true
+        let action = pendingSignatureAction
+        pendingSignatureAction = nil
+        switch action {
+        case .beginEdit:
+            presentTextEditor()
+        case .deleteSelection:
+            deleteSelectedText()
+        case .export:
+            shouldPresentExport = true
+        case nil:
+            break
+        }
+    }
+
+    func cancelSignatureWarning() {
+        pendingSignatureAction = nil
+    }
+
+    func recognizeCurrentPage() async {
+        guard featureAccess.canEditExistingText() else {
+            errorMessage = "Editing existing text requires PDF Pro."
+            return
+        }
+        guard let page = document.page(at: currentPageIndex) else { return }
+        isRecognizingText = true
+        defer { isRecognizingText = false }
+        do {
+            let tokens = try await ocrService.recognize(page: page)
+            textEngine.importOCR(tokens, on: currentPageIndex, document: document)
+            HapticsManager.success()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func presentTextEditor() {
+        guard let selectedTextElement else { return }
+        textDraft = selectedTextElement.text
+        styleDraft = selectedTextElement.style
+        showExistingTextEditor = true
     }
 
     private func loadSavedSignature() {

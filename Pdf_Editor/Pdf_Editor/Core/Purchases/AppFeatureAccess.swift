@@ -9,6 +9,7 @@ enum AppFeatureLimits {
 
 enum AppFeature: CaseIterable {
     case unlimitedEditing
+    case existingTextEditing
     case unlimitedExports
     case advancedAnnotations
     case pageManagement
@@ -20,6 +21,7 @@ enum AppFeature: CaseIterable {
     var displayName: String {
         switch self {
         case .unlimitedEditing: "Unlimited PDF editing"
+        case .existingTextEditing: "Edit existing PDF text"
         case .unlimitedExports: "Unlimited exports"
         case .advancedAnnotations: "Advanced annotations"
         case .pageManagement: "Page management"
@@ -49,6 +51,10 @@ final class AppFeatureAccess {
     }
 
     func canUsePageManagement() -> Bool {
+        isPro
+    }
+
+    func canEditExistingText() -> Bool {
         isPro
     }
 
