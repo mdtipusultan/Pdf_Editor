@@ -8,12 +8,18 @@
 
 /* Begin PBXFileReference section */
 		CE688FF6306AAD6D000212C6 /* Pdf_Editor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pdf_Editor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CE689010306AAD70000212C6 /* Pdf_EditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Pdf_EditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CE688FF8306AAD6D000212C6 /* Pdf_Editor */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Pdf_Editor;
+			sourceTree = "<group>";
+		};
+		CE689011306AAD70000212C6 /* Pdf_EditorTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Pdf_EditorTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -33,6 +39,7 @@
 			isa = PBXGroup;
 			children = (
 				CE688FF8306AAD6D000212C6 /* Pdf_Editor */,
+				CE689011306AAD70000212C6 /* Pdf_EditorTests */,
 				CE688FF7306AAD6D000212C6 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +48,7 @@
 			isa = PBXGroup;
 			children = (
 				CE688FF6306AAD6D000212C6 /* Pdf_Editor.app */,
+				CE689010306AAD70000212C6 /* Pdf_EditorTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,7 +78,48 @@
 			productReference = CE688FF6306AAD6D000212C6 /* Pdf_Editor.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CE689012306AAD70000212C6 /* Pdf_EditorTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CE689013306AAD70000212C6 /* Build configuration list for PBXNativeTarget "Pdf_EditorTests" */;
+			buildPhases = (
+				CE689014306AAD70000212C6 /* Sources */,
+				CE689015306AAD70000212C6 /* Frameworks */,
+				CE689016306AAD70000212C6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CE689017306AAD70000212C6 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CE689011306AAD70000212C6 /* Pdf_EditorTests */,
+			);
+			name = Pdf_EditorTests;
+			packageProductDependencies = (
+			);
+			productName = Pdf_EditorTests;
+			productReference = CE689010306AAD70000212C6 /* Pdf_EditorTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		CE689018306AAD70000212C6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CE688FEE306AAD6D000212C6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CE688FF5306AAD6D000212C6;
+			remoteInfo = Pdf_Editor;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		CE689017306AAD70000212C6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CE688FF5306AAD6D000212C6 /* Pdf_Editor */;
+			targetProxy = CE689018306AAD70000212C6 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		CE688FEE306AAD6D000212C6 /* Project object */ = {
@@ -100,6 +149,7 @@
 			projectRoot = "";
 			targets = (
 				CE688FF5306AAD6D000212C6 /* Pdf_Editor */,
+				CE689012306AAD70000212C6 /* Pdf_EditorTests */,
 			);
 		};
 /* End PBXProject section */
@@ -116,6 +166,36 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		CE688FF2306AAD6D000212C6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		CE689015306AAD70000212C6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CE689016306AAD70000212C6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CE689014306AAD70000212C6 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -257,6 +337,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Add photos as annotations to your PDF documents.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -289,6 +370,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Add photos as annotations to your PDF documents.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -310,6 +392,44 @@
 			};
 			name = Release;
 		};
+		CE689019306AAD70000212C6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4NG5UXJYS8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.office.Pdf-EditorTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Pdf_Editor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Pdf_Editor";
+			};
+			name = Debug;
+		};
+		CE68901A306AAD70000212C6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4NG5UXJYS8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.office.Pdf-EditorTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Pdf_Editor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Pdf_Editor";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -327,6 +447,15 @@
 			buildConfigurations = (
 				CE689002306AAD70000212C6 /* Debug */,
 				CE689003306AAD70000212C6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CE689013306AAD70000212C6 /* Build configuration list for PBXNativeTarget "Pdf_EditorTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CE689019306AAD70000212C6 /* Debug */,
+				CE68901A306AAD70000212C6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
